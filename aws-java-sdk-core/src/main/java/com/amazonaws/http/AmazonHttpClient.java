@@ -70,6 +70,7 @@ import com.amazonaws.http.exception.HttpRequestTimeoutException;
 import com.amazonaws.http.request.HttpRequestFactory;
 import com.amazonaws.http.response.AwsResponseHandlerAdapter;
 import com.amazonaws.http.settings.HttpClientSettings;
+import com.amazonaws.http.ConnectionPoolMonitor;
 import com.amazonaws.http.timers.client.ClientExecutionAbortTrackerTask;
 import com.amazonaws.http.timers.client.ClientExecutionTimeoutException;
 import com.amazonaws.http.timers.client.ClientExecutionTimer;
@@ -128,6 +129,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.Header;
@@ -212,12 +214,23 @@ public class AmazonHttpClient {
      * Internal client for sending HTTP requests
      */
     private ConnectionManagerAwareHttpClient httpClient;
+
+    /**
+     * Atomic reference to the HTTP client for thread-safe updates by the connection pool monitor
+     */
+    private final AtomicReference<ConnectionManagerAwareHttpClient> httpClientRef = new AtomicReference<>();
+
     /**
      * Client configuration options, such as proxy httpClientSettings, max retries, etc.
      */
     private final ClientConfiguration config;
 
     private final RetryPolicy retryPolicy;
+
+    /**
+     * Connection pool monitor for preventing connection pool exhaustion
+     */
+    private ConnectionPoolMonitor connectionPoolMonitor;
 
     /**
      * Client configuration options, such as proxy httpClientSettings, max retries, etc.
@@ -354,6 +367,14 @@ public class AmazonHttpClient {
              requestMetricCollector,
              HttpClientSettings.adapt(config, useBrowserCompatibleHostNameVerifier, calculateCRC32FromCompressedData));
         this.httpClient = httpClientFactory.create(this.httpClientSettings);
+        this.httpClientRef.set(this.httpClient);
+
+        // Initialize and start the connection pool monitor if enabled
+        if (config.getConnectionPoolMonitorEnabled()) {
+            this.connectionPoolMonitor = new ConnectionPoolMonitor(
+                httpClientRef, httpClientSettings, httpClientFactory);
+            this.connectionPoolMonitor.start();
+        }
     }
 
     /**
@@ -478,6 +499,12 @@ public class AmazonHttpClient {
     public void shutdown() {
         clientExecutionTimer.shutdown();
         httpRequestTimer.shutdown();
+
+        // Stop the connection pool monitor if it's running
+        if (connectionPoolMonitor != null) {
+            connectionPoolMonitor.stop();
+        }
+
         IdleConnectionReaper.removeConnectionManager(httpClient.getHttpClientConnectionManager());
         httpClient.getHttpClientConnectionManager().shutdown();
     }
