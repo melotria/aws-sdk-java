@@ -111,6 +111,11 @@ public class ClientConfiguration {
     public static final boolean DEFAULT_USE_REAPER = true;
 
     /**
+     * The default on whether to use the connection pool monitor to prevent connection pool exhaustion
+     */
+    public static final boolean DEFAULT_USE_CONNECTION_POOL_MONITOR = true;
+
+    /**
      * The default on whether to use gzip decompression.
      */
     public static final boolean DEFAULT_USE_GZIP = false;
@@ -273,6 +278,13 @@ public class ClientConfiguration {
      * where the modifyThread and modifyThreadGroup permissions are not allowed.
      */
     private boolean useReaper = DEFAULT_USE_REAPER;
+
+    /**
+     * Optional whether to use the connection pool monitor to prevent connection pool exhaustion.
+     * This is particularly useful for long-running applications that may experience connection
+     * pool exhaustion after several days of operation.
+     */
+    private boolean connectionPoolMonitorEnabled = DEFAULT_USE_CONNECTION_POOL_MONITOR;
 
     /**
      * Optional whether to use gzip decompression when receiving HTTP responses.
@@ -1654,6 +1666,37 @@ public class ClientConfiguration {
      */
     public ClientConfiguration withReaper(boolean use) {
         setUseReaper(use);
+        return this;
+    }
+
+    /**
+     * Checks if the connection pool monitor is enabled
+     *
+     * @return true if the connection pool monitor is enabled
+     */
+    public boolean getConnectionPoolMonitorEnabled() {
+        return connectionPoolMonitorEnabled;
+    }
+
+    /**
+     * Sets whether the connection pool monitor is enabled
+     *
+     * @param enabled
+     *            whether the connection pool monitor is enabled
+     */
+    public void setConnectionPoolMonitorEnabled(boolean enabled) {
+        this.connectionPoolMonitorEnabled = enabled;
+    }
+
+    /**
+     * Sets whether the connection pool monitor is enabled
+     *
+     * @param enabled
+     *            whether the connection pool monitor is enabled
+     * @return The updated ClientConfiguration object.
+     */
+    public ClientConfiguration withConnectionPoolMonitorEnabled(boolean enabled) {
+        setConnectionPoolMonitorEnabled(enabled);
         return this;
     }
 
